@@ -58,7 +58,7 @@ def apply_augment(image, ops_list=None):
             image = op(image)
         return image
 
-    return tuple([_apply_augment(image, ops) for ops in ops_list]) ###多个op分别生成image
+    return tuple([_apply_augment(image, ops) for ops in ops_list])  # 多个op分别生成image
 
 
 def compose_augment_seq(aug_list, is_training=False):
@@ -74,7 +74,7 @@ def compose_augment_seq(aug_list, is_training=False):
     return [
         generate_augment_ops(aug_type, is_training=is_training, **kwargs)
         for aug_type, kwargs in aug_list
-    ]
+    ]   # [augfun, augfun]
 
 
 def generate_augment_ops(aug_type, is_training=False, **kwargs):
@@ -144,7 +144,7 @@ def generate_augment_ops(aug_type, is_training=False, **kwargs):
 
 
 # 返回aug_fn_list : [[aug_fn, aug_fn...], [...], ..., [最后一个是test的aug_fn_list]]
-def retrieve_augment(aug_list, **kwargs):
+def retrieve_augment(aug_list, **kwargs):   # aug_list = [cnr0.5+hflip+jitter_b0.4_c0.4_s0.4_h0.4+gray0.2+blur0.5,+]
     """Retrieves Augmentation Sequences.
 
   Args:
@@ -222,18 +222,19 @@ def retrieve_augment(aug_list, **kwargs):
     # Retrieve augmentation ops by chaining ops.
     aug_fn_list = []
     for aug_names in aug_list:
-        aug_name_list = filter(None, aug_names.split('+'))
+        aug_name_list = filter(None, aug_names.split('+'))  # [cnr0.5, hflip, jitter_b0.4_c0.4_s0.4_h0.4, gray0.2, blur0.5]
         aug_fn = []
         for aug_name in aug_name_list:
             aug_name, aug_args = _get_augment_args(aug_name, **kwargs)
             if aug_name in ['', 'x']:
-                aug_fn = _retrieve_augment('base', is_training=False)(**kwargs)
+                aug_fn = _retrieve_augment('base', is_training=False)(**kwargs)  # not changed
             else:
                 aug_fn += _retrieve_augment(aug_name,
-                                            is_training=True)(**aug_args)
-        aug_fn_list.append(aug_fn)
-        if len(aug_fn_list) == 1:
+                                            is_training=True)(**aug_args)   # others
+        aug_fn_list.append(aug_fn)  # [[(aug, {aug_params}),],[]]
+        if len(aug_fn_list) == 1:  # 这是干嘛有点看不懂
             test_aug_fn = []
+            # print("in test, aug_names: ", aug_names)
             aug_name_list = filter(None, aug_names.split('+'))
             for aug_name in aug_name_list:
                 aug_name, aug_args = _get_augment_args(aug_name, **kwargs)
@@ -244,3 +245,5 @@ def retrieve_augment(aug_list, **kwargs):
                     test_aug_fn += _retrieve_augment(
                         aug_name, is_training=False)(**aug_args)
     return aug_fn_list + [test_aug_fn]
+
+

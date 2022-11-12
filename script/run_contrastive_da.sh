@@ -24,64 +24,63 @@
 DATA=cifar10ood
 METHOD=Contrastive
 SEED=1
-CATEGORY=9
-NET_TYPE=ResNet18
+CATEGORY=1
+NET_TYPE=resnet18
 PREFIX=contrastive_da
-MODEL_DIR='./logs1/' # [/path/to/directory/to/save/model]
-CUDA_VISIBLE_DEVICES=2 python train_and_eval_loop.py \
-  --force_init="True"\
-  --model_dir="${MODEL_DIR}" \
-  --method=${METHOD} \
-  --file_path="${DATA}_${NET_TYPE}_${PREFIX}_s${SEED}_c${CATEGORY}" \
-  --dataset=${DATA} \
-  --category=${CATEGORY} \
-  --seed=${SEED} \
-  --root="/home/fqq/data/cifar-10-batches-py" \
-  --net_type=${NET_TYPE} \
-  --net_width=1 \
-  --latent_dim=0 \
-  --aug_list="cnr0.5+hflip+jitter_b0.4_c0.4_s0.4_h0.4+gray0.2+blur0.5,+" \
-  --aug_list_for_test="x" \
-  --input_shape="32,32,3" \
-  --optim_type=sgd \
-  --sched_type=cos \
-  --learning_rate=0.01 \
-  --momentum=0.9 \
-  --weight_decay=0.0003 \
-  --head_dims="512,512,512,512,512,512,512,512,128" \
-  --num_epoch=2048 \
-  --batch_size=32 \
-  --temperature=0.2 \
-  --distaug_type rot > DROC_constrative_da_${NET_TYPE}_c${CATEGORY}.log 2>&1 &\
+MODEL_DIR='./logs2/' # [/path/to/directory/to/save/model]
+CUDA_VISIBLE_DEVICES=5 python train_and_eval_loop.py \
+  --force_init True\
+  --model_dir "${MODEL_DIR}" \
+  --method ${METHOD} \
+  --file_path "${DATA}_${NET_TYPE}_${PREFIX}_s${SEED}_c${CATEGORY}" \
+  --dataset ${DATA} \
+  --category ${CATEGORY} \
+  --seed ${SEED} \
+  --data_root "/home/fqq/data" \
+  --net_type ${NET_TYPE} \
+  --in_channels 3 \
+  --latent_dim 512 \
+  --aug_list "cnr0.5+hflip+jitter_b0.4_c0.4_s0.4_h0.4+gray0.2,+" \
+  --aug_list_for_test "x" \
+  --optim_type sgd \
+  --sched_type cosine \
+  --learning_rate 0.001 \
+  --momentum 0.9 \
+  --weight_decay 0.0003 \
+  --head_dims 512 512 128 \
+  --num_epoch 100 \
+  --batch_size 64 \
+  --temperature 0.2 \
+  --distaug_type rot #> DROC_constrative_da_${NET_TYPE}_c${CATEGORY}.log 2>&1 &\
 
 # To reproduce results in Figure 7,
-#DATA=cifar10ood
-#METHOD=Contrastive
-#SEED=1
-#CATEGORY=0
-#MODEL_DIR='.' # [/path/to/directory/to/save/model]
+#DATA cifar10ood
+#METHOD Contrastive
+#SEED 1
+#CATEGORY 0
+#MODEL_DIR '.' # [/path/to/directory/to/save/model]
 #DISTAUG_TYPE in {1,2,3,4,5,6,7,8}
 #python train_and_eval_loop.py \
-#  --model_dir="${MODEL_DIR}" \
-#  --method=${METHOD} \
-#  --file_path="${DATA}_${PREFIX}_s${SEED}_c${CATEGORY}" \
-#  --dataset=${DATA} \
-#  --category=${CATEGORY} \
-#  --seed=${SEED};
-#  --root='' \
-#  --net_type=ResNet18 \
-#  --net_width=1 \
-#  --latent_dim=0 \
-#  --aug_list="cnr0.5+jitter_b0.4_c0.4_s0.4_h0.4+gray0.2+blur0.5,+" \
-#  --aug_list_for_test="x" \
-#  --input_shape="32,32,3" \
-#  --optim_type=sgd \
-#  --sched_type=cos \
-#  --learning_rate=0.01 \
-#  --momentum=0.9 \
-#  --weight_decay=0.0003 \
-#  --head_dims="512,512,512,512,512,512,512,512,128" \
-#  --num_epoch=2048 \
-#  --batch_size=32 \
-#  --temperature=0.2 \
+#  --model_dir "${MODEL_DIR}" \
+#  --method ${METHOD} \
+#  --file_path "${DATA}_${PREFIX}_s${SEED}_c${CATEGORY}" \
+#  --dataset ${DATA} \
+#  --category ${CATEGORY} \
+#  --seed ${SEED};
+#  --root '' \
+#  --net_type ResNet18 \
+#  --net_width 1 \
+#  --latent_dim 0 \
+#  --aug_list "cnr0.5+jitter_b0.4_c0.4_s0.4_h0.4+gray0.2+blur0.5,+" \
+#  --aug_list_for_test "x" \
+#  --input_shape "32,32,3" \
+#  --optim_type sgd \
+#  --sched_type cos \
+#  --learning_rate 0.01 \
+#  --momentum 0.9 \
+#  --weight_decay 0.0003 \
+#  --head_dims "512,512,512,512,512,512,512,512,128" \
+#  --num_epoch 2048 \
+#  --batch_size 32 \
+#  --temperature 0.2 \
 #  --distaug_type "${DISTAUG_TYPE}"

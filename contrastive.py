@@ -16,104 +16,77 @@
 # Lint as: python3
 """Contrastive learning module."""
 
-import tensorflow as tf
-
+import torch
 from util.train import BaseTrain
 
 
 class Contrastive(BaseTrain):
-  """Contrastive learning."""
+    """Contrastive learning."""
+    def __init__(self, args):
+        super(Contrastive, self).__init__(args=args)
 
-  def __init__(self, hparams):
-    super(Contrastive, self).__init__(hparams=hparams)
+    def set_args(self, args):
+        # Algorithm-specific parameter
+        self.temperature = args.temperature
 
-  def set_hparams(self, hparams):
-    # Algorithm-specific parameter
-    self.temperature = hparams.temperature
+        # File suffix
+        self.file_suffix = 'temp{:g}'.format(self.temperature)
 
-    # File suffix
-    self.file_suffix = 'temp{:g}'.format(self.temperature)
+    def set_metrics(self):
+        # Metrics
+        self.list_of_metrics = [
+            'loss.train', 'loss.xe', 'loss.L2', 'acc.train'
+        ]
+        self.list_of_eval_metrics = [
+            'embed.auc',
+            # 'embed.kocsvm',
+            # 'embed.locsvm',
+            # 'embed.kde',
+            # 'embed.gde',
+            'pool.auc',
+            # 'pool.kocsvm',
+            # 'pool.locsvm',
+            # 'pool.kde',
+            # 'pool.gde',
+        ]
+        # self.metric_of_interest = [
+        #     'embed.auc',
+        #     'embed.kocsvm',
+        #     'embed.locsvm',
+        #     'embed.kde',
+        #     'embed.gde',
+        #     'pool.auc',
+        #     'pool.kocsvm',
+        #     'pool.locsvm',
+        #     'pool.kde',
+        #     'pool.gde',
+        # ]
+        # assert all([
+        #     m in self.list_of_eval_metrics for m in self.metric_of_interest
+        # ]), 'Some metric does not exist'
+        
+        self.eval_metrics = {}
+        for metric in self.list_of_eval_metrics:
+            self.eval_metrics[metric] = None
+    
+    def train_step(self, data):
+        x1, x2, _, _ = data
+        batch = x1.size(0)
+        # print("x1.size()", x1.size())
+        x = torch.cat((x1, x2), dim=0)
+        y = torch.arange(0, batch).to(x1.device)
+        output = self.model(x)
+        embeds = output['embeds']
+        embeds = torch.nn.functional.normalize(embeds, dim=-1)
+        embeds1, embeds2 = torch.split(embeds, batch)
+        # ip = torch.exp(torch.matmul(embeds1, embeds2.T) / self.temperature)
+        # loss = - torch.sum(torch.log(ip.diag() / torch.sum(ip, dim=-1)))
+        
+        ip = torch.matmul(embeds1, embeds2.T) / self.temperature
+        # print("ip: ", ip)
+        loss = torch.nn.CrossEntropyLoss()(ip, y)
+        # loss_l2 = self.get_loss_l2()
+        #loss = loss_xe  #+ self.weight_decay * loss_l2
+        acc = torch.sum(torch.argmax(ip, axis=-1) == y).item() / len(y)
+        return loss, batch, acc
 
-  def set_metrics(self):
-    # Metrics
-    self.list_of_metrics = ['loss.train', 'loss.xe', 'loss.L2', 'acc.train']
-    self.list_of_eval_metrics = [
-        'embed.auc',
-        'embed.kocsvm',
-        'embed.locsvm',
-        'embed.kde',
-        'embed.gde',
-        'pool.auc',
-        'pool.kocsvm',
-        'pool.locsvm',
-        'pool.kde',
-        'pool.gde',
-    ]
-    self.metric_of_interest = [
-        'embed.auc',
-        'embed.kocsvm',
-        'embed.locsvm',
-        'embed.kde',
-        'embed.gde',
-        'pool.auc',
-        'pool.kocsvm',
-        'pool.locsvm',
-        'pool.kde',
-        'pool.gde',
-    ]
-    assert all([
-        m in self.list_of_eval_metrics for m in self.metric_of_interest
-    ]), 'Some metric does not exist'
-
-  def get_target_labels(self, x, is_onehot=True, replica_context=None):
-    x_concat = self.cross_replica_concat(x, replica_context=replica_context)
-    replica_idx = replica_context.replica_id_in_sync_group
-    global_batch_size = x_concat.shape[0]
-    num_per_replica = tf.math.floordiv(global_batch_size,
-                                       replica_context.num_replicas_in_sync)
-    target_labels = tf.range(replica_idx * num_per_replica,
-                             (replica_idx + 1) * num_per_replica)
-    if is_onehot:
-      target_labels = tf.one_hot(target_labels, global_batch_size)
-    return target_labels
-
-  @tf.function
-  def train_step(self, iterator):
-    """Train step."""
-  # simCLR可以转化为找到最相似的，分类：最相似为1，其他为0
-    def step_fn(data):
-      x1, x2 = data[0], data[1]
-      replica_context = tf.distribute.get_replica_context()
-      y = self.get_target_labels(
-          x1, is_onehot=True, replica_context=replica_context)
-      with tf.GradientTape() as tape:
-        xc = tf.concat((x1, x2), axis=0)
-        embeds = self.model(xc, training=True)['embeds']
-        embeds = tf.nn.l2_normalize(embeds, axis=1)
-        embeds1, embeds2 = tf.split(embeds, 2)
-        embeds2_concat = self.cross_replica_concat(
-            embeds2, replica_context=replica_context)
-        ip = tf.matmul(embeds1, embeds2_concat, transpose_b=True)
-        loss_xe = tf.keras.losses.categorical_crossentropy(
-            y, tf.divide(ip, self.temperature), from_logits=True)
-        loss_xe = self.global_reduce_mean(loss_xe)
-        loss_l2 = self.loss_l2(self.model.trainable_weights)
-        loss = loss_xe + self.weight_decay * loss_l2
-      grad = tape.gradient(loss, self.model.trainable_weights)
-      self.optimizer.apply_gradients(zip(grad, self.model.trainable_weights))
-      # monitor
-      self.metrics['loss.train'].update_state(loss)
-      self.metrics['loss.xe'].update_state(loss_xe)
-      self.metrics['loss.L2'].update_state(loss_l2)
-      self.metrics['acc.train'].update_state(
-          tf.argmax(y, axis=1), tf.argmax(ip, axis=1))
-
-    # Call one step
-    self.strategy.run(step_fn, args=(next(iterator),))
-
-  def global_reduce_mean(self, tensor, axis=None, replica_context=None):
-    """Return global mean across multiple replica."""
-    return tf.divide(
-        tf.reduce_sum(tensor, axis=axis),
-        self.cross_replica_concat(tensor,
-                                  replica_context=replica_context).shape[0])

@@ -1,141 +1,108 @@
-# coding=utf-8
-# Copyright 2021 The Google Research Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+'''ResNet in PyTorch.
+BasicBlock and Bottleneck module is from the original ResNet paper:
+[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+    Deep Residual Learning for Image Recognition. arXiv:1512.03385
+'''
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-# Lint as: python3
-"""ResNet definitions."""
+class BasicBlock(nn.Module):
+    expansion = 1
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
-import functools
-from model.resnet_util import basic_stack1
-from model.resnet_util import bottleneck_stack1
-from model.resnet_util import ResNet
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != self.expansion*out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, self.expansion*out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*out_channels)
+            )
 
-__all__ = [
-    'ResNet10',
-    'ResNet18',
-    'ResNet34',
-    'ResNet50',
-    'ResNet101',
-    'ResNet152',
-]
+    def forward(self, x):
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = self.relu(out)
+        return out
 
-BLOCK = {
-    'ResNet10': [1, 1, 1, 1],
-    'ResNet18': [2, 2, 2, 2],
-    'ResNet34': [3, 4, 6, 3],
-    'ResNet50': [3, 4, 6, 3],
-    'ResNet101': [3, 4, 23, 3],
-    'ResNet152': [3, 8, 36, 3],
-}
+class Bottleneck(nn.Module):
+    expansion = 4
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv3 = nn.Conv2d(out_channels, self.expansion*out_channels, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(self.expansion * out_channels)
 
-EXPANSION = {
-    'ResNet10': 1,
-    'ResNet18': 1,
-    'ResNet34': 1,
-    'ResNet50': 4,
-    'ResNet101': 4,
-    'ResNet152': 4,
-}
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != self.expansion*out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, self.expansion*out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*out_channels)
+            )
 
-STACK = {
-    'ResNet10': basic_stack1,
-    'ResNet18': basic_stack1,
-    'ResNet34': basic_stack1,
-    'ResNet50': bottleneck_stack1,
-    'ResNet101': bottleneck_stack1,
-    'ResNet152': bottleneck_stack1,
-}
-
-
-def ResNetV1(arch='ResNet18',
-             width=1.0,
-             head_dims=None,
-             input_shape=None,
-             num_class=1000,
-             pooling='avg',
-             normalization='bn',
-             activation='relu'):
-  """Instantiates the ResNet architecture."""
-
-  def stack_fn(x, arch, width=1.0):
-    block, stack, expansion = BLOCK[arch], STACK[arch], EXPANSION[arch]
-    x = stack(
-        x,
-        int(64 * width),
-        block[0],
-        expansion=expansion,
-        stride1=1,
-        normalization=normalization,
-        activation=activation,
-        name='conv2')
-    x = stack(
-        x,
-        int(128 * width),
-        block[1],
-        expansion=expansion,
-        normalization=normalization,
-        activation=activation,
-        name='conv3')
-    x = stack(
-        x,
-        int(256 * width),
-        block[2],
-        expansion=expansion,
-        normalization=normalization,
-        activation=activation,
-        name='conv4')
-    return stack(
-        x,
-        int(512 * width),
-        block[3],
-        expansion=expansion,
-        normalization=normalization,
-        activation=activation,
-        name='conv5')
-
-  return ResNet(
-      stack_fn=functools.partial(stack_fn, arch=arch, width=width),
-      preact=False,
-      model_name='{}_width{:g}_{}_{}'.format(arch, width, normalization,
-                                             activation),
-      head_dims=head_dims,
-      input_shape=input_shape,
-      pooling=pooling,
-      normalization=normalization,
-      activation=activation,
-      num_class=num_class)
+    def forward(self, x):
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = self.relu(out)
+        return out
 
 
-def ResNet10(**kwargs):
-  return ResNetV1(arch='ResNet10', **kwargs)
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, channels, output_dim):
+        super(ResNet, self).__init__()
+        self.in_channels = 64
+        self.conv1 = nn.Conv2d(channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU()
+        self.pool = nn.AvgPool2d(4)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        # self.linear = nn.Linear(512, output_dim)
+        self.out_dim = output_dim
+
+    def _make_layer(self, block, out_channels, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_channels, out_channels, stride))
+            self.in_channels = out_channels * block.expansion
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+
+        out = self.pool(out)
+        out = out.view(out.size(0), -1)
+        # out = self.linear(out)
+        return out
 
 
-def ResNet18(**kwargs):
-  return ResNetV1(arch='ResNet18', **kwargs)
+def ResNet18(in_channels, out_dim):
+    return ResNet(BasicBlock, [2,2,2,2], channels = in_channels, output_dim = out_dim)
 
+def ResNet34(in_channels, out_dim):
+    return ResNet(BasicBlock, [3,4,6,3], channels = in_channels, output_dim = out_dim)
 
-def ResNet34(**kwargs):
-  return ResNetV1(arch='ResNet34', **kwargs)
-
-
-def ResNet50(**kwargs):
-  return ResNetV1(arch='ResNet50', **kwargs)
-
-
-def ResNet101(**kwargs):
-  return ResNetV1(arch='ResNet101', **kwargs)
-
-
-def ResNet152(**kwargs):
-  return ResNetV1(arch='ResNet152', **kwargs)
+def ResNet50(in_channels, out_dim):
+    return ResNet(Bottleneck, [3,4,6,3], channels = in_channels, output_dim = out_dim)
