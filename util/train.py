@@ -35,7 +35,6 @@ from torchvision.models import resnet18
 import torch.nn as nn
 import logging
 from sklearn.metrics import roc_auc_score
-from sklearn.svm.classes import OneClassSVM
 from sklearn.neighbors import KernelDensity
 from sklearn.mixture import GaussianMixture
 

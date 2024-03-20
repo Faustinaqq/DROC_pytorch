@@ -28,7 +28,7 @@ CATEGORY=1
 NET_TYPE=resnet18
 PREFIX=contrastive_da
 MODEL_DIR='./logs2/' # [/path/to/directory/to/save/model]
-CUDA_VISIBLE_DEVICES=5 python train_and_eval_loop.py \
+CUDA_VISIBLE_DEVICES=0 python train_and_eval_loop.py \
   --force_init True\
   --model_dir "${MODEL_DIR}" \
   --method ${METHOD} \
@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=5 python train_and_eval_loop.py \
   --dataset ${DATA} \
   --category ${CATEGORY} \
   --seed ${SEED} \
-  --data_root "/home/fqq/data" \
+  --data_root "/data2/fqq/" \
   --net_type ${NET_TYPE} \
   --in_channels 3 \
   --latent_dim 512 \
